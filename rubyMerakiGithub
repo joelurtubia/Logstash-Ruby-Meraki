@@ -1,0 +1,119 @@
+##Ruby Code for connect meraki Api
+require 'net/http'
+require 'uri'
+require 'json'
+
+
+
+
+# the value of `params` is the value of the hash passed to `script_params`
+# in the logstash configuration
+def register(params)
+        @IDTarget = params["IDTarget"]
+		@token = params["token"]
+		@url = params["url"]
+		@UrlDdevice = "https://api.meraki.com/api/v0/networks/"
+end
+
+# the filter method receives an event and must return a list of events.
+# Dropping an event means not including it in the return array,
+# while creating new ones only requires you to add a new instance of
+# LogStash::Event to the returned array
+
+def filter(event)
+		
+		#firstWord = event.get('id')
+		if (event.get('id') == @IDTarget)
+		event.set('FirstFilter','OK Aplly first filter!!!')
+		return [event]
+		responseCode, checkUrl = extractData( @url, @token)
+		event.set('responseCode',responseCode)
+		while (responseCode == "301" || responseCode == "302") do
+			event.set('echo','redierct web service 302')
+			responseCode, checkUrl = extractData( checkUrl, @token)
+		end
+		
+		#event.set('idRubyyy',"222")
+		#firstWord = event['msg'].split(' ')[0]
+		#uri = URI.parse('http://echo.jsontest.com/word/' + firstWord)
+		#uri = URI.parse(@url)
+		#response = Net::HTTP.get_response(uri)
+			if responseCode == "200"
+				#result = JSON.parse(response.body)
+				#returnWord = result['word']
+				event.set('echo','OK!! reaching web service')
+				checkUrl.each do |doc|
+					puts doc["id"] #reference properties like this	
+					event.set('idEvento',doc["id"])
+					event.set('organizationId',doc["organizationId"])
+					event.set('name',doc["name"])
+					event.set('type',doc["type"])
+					## Get Devices
+					
+					checkUrlDevice = @UrlDdevice+doc["id"]+"/devices"
+					#checkUrlDevice = "https://api.meraki.com/api/v0/networks/N_582090251837684187/devices"
+					event.set('UrlDevice',checkUrlDevice)
+					responseCode2, checkUrlDevice = extractData( checkUrlDevice, @token)
+					event.set('responseCode2',responseCode2)
+					while (responseCode2 == "301" || responseCode2 == "302") do
+						event.set('echo','redierct web service 302')
+						responseCode2, checkUrlDevice = extractData( checkUrlDevice, @token)
+					end
+					if responseCode2 == "200"
+						#result = JSON.parse(response.body)
+						#returnWord = result['word']
+						event.set('echoDevice','OK!! reaching web service Device')
+						companies = []
+						checkUrlDevice.each do |doc|
+			
+						companies << doc
+
+						
+											
+						event.set('idDevicelanIp',doc["lanIp"])
+						
+						end
+						companies_json = companies.to_json
+						event.set('idDevicelanIpALL',companies_json)	
+						
+					end	
+					
+
+				end				
+			else
+				event.set('echo','ERROR reaching web service')
+			end
+		return [event]
+        else
+                return [] # return empty array to cancel event
+        end		
+end
+
+
+def extractData( url, token)
+
+		puts "Check status for  URL 1 [#{url}]"
+		uri = URI.parse(url)
+		request = Net::HTTP::Get.new(uri)
+		request.content_type = "application/json"
+		request["X-Cisco-Meraki-Api-Key"] = @token
+
+		req_options = {
+		use_ssl: uri.scheme == "https",
+		}
+
+		response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
+		http.request(request)
+		end
+	if 	(response.code == "301" || response.code == "302")
+		puts "redirect again from  extractData Loop [#{response.header['Location']}]"
+		return response.code,response.header['Location']
+	end		
+	if (response.code == "200")
+		result = JSON.parse(response.body)
+		
+
+		#print result
+		return response.code,result
+	end	
+end 

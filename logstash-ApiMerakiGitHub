@@ -1,0 +1,93 @@
+input {
+  http_poller {
+    urls => {
+      "meraki_traffic" => {
+        method => get
+		url => "https://api.meraki.com/api/v0/organizations"
+        headers => {
+          Accept => "application/json"
+	  "X-Cisco-Meraki-API-Key" => "Key_4885630b260e"
+        }
+      }
+    }
+    request_timeout => 60
+    # Supports "cron", "every", "at" and "in" schedules by rufus scheduler
+    schedule => { cron => "*/30 * * * * UTC"}
+    codec => "json"
+    # A hash of request metadata info (timing, response headers, etc.) will be sent here
+    metadata_target => "http_poller_metadata"
+  }
+}
+
+filter {
+
+  clone {
+    clones => ["devices","clients"]
+  }
+
+  if [type] == "devices" {
+	  ruby {
+		path => "/etc/logstash/ruby.rb"
+		script_params => {
+		  "IDTarget" => 5855555555555555555
+		  "token" => "Key_4885630b260e"
+		  "url" => "https://api.meraki.com/api/v0/organizations/5855555555555555555/networks"
+		  "case" => "devices"
+		}
+		
+	  }
+  
+  } else if [type] == "clients" {
+		  ruby {
+			path => "/etc/logstash/ruby.rb"
+			script_params => {
+			  "IDTarget" => 5855555555555555555
+			  "token" => "Key_4885630b260e"
+			  "url" => "https://api.meraki.com/api/v0/organizations/5855555555555555555/networks"
+			  "case" => "clients"
+			}
+
+		  }
+  }else {
+		  ruby {
+			path => "/etc/logstash/ruby.rb"
+			script_params => {
+			  "IDTarget" => 5855555555555555555
+			  "token" => "Key_4885630b260e"
+			  "url" => "https://api.meraki.com/api/v0/organizations/5855555555555555555/networks"
+			  "case" => "organizations"
+			}
+
+		  }
+  }
+
+}
+
+output {
+ if "devices" in [tags] {
+
+ 	elasticsearch {
+		hosts => ["localhost:9200","192.168.10.101:9200"]
+		index => "apimerakidevices"
+	}  
+ }else if "clients" in [tags] {
+
+		elasticsearch {
+			hosts => ["localhost:9200","192.168.10.101:9200"]
+			index => "apimerakiclients"
+		}
+	}else if "organizations" in [tags] {
+
+		elasticsearch {
+			hosts => ["localhost:9200","192.168.10.101:9200"]
+			index => "apimerakiorganizations"
+		}
+	}	
+  stdout {
+    codec => rubydebug
+  }
+  
+  
+ 
+
+}
